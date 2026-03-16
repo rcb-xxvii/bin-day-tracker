@@ -2,13 +2,78 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.util import dt as dt_util
 
-from .const import COLOUR_OPTIONS
-from .helpers import calculate_next_collection
+from .const import COLOUR_OPTIONS, DOMAIN
+from .helpers import (
+    calculate_next_collection,
+    get_enabled_bins_with_calculations,
+    select_next_display_bin,
+)
+
+
+def _next_midnight():
+    """Return the next local midnight."""
+    now = dt_util.now()
+    tomorrow = now.date() + timedelta(days=1)
+    return dt_util.as_local(dt_util.parse_datetime(f"{tomorrow.isoformat()}T00:00:00"))
+
+
+class BinDayTrackerBaseEntity(SensorEntity):
+    """Base entity for Bin Day Tracker."""
+
+    _attr_should_poll = False
+    _unsub_midnight: CALLBACK_TYPE | None = None
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialize the base entity."""
+        self.entry = entry
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for grouping entities."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.entry.entry_id)},
+            name="Bin Day Tracker",
+            manufacturer="Community",
+            model="Bin Day Tracker",
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register midnight refresh."""
+        self._schedule_next_midnight_refresh()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Clean up listeners."""
+        if self._unsub_midnight:
+            self._unsub_midnight()
+            self._unsub_midnight = None
+
+    @callback
+    def _schedule_next_midnight_refresh(self) -> None:
+        """Schedule the next midnight refresh."""
+        if self._unsub_midnight:
+            self._unsub_midnight()
+
+        self._unsub_midnight = async_track_point_in_time(
+            self.hass,
+            self._handle_midnight_refresh,
+            _next_midnight(),
+        )
+
+    @callback
+    def _handle_midnight_refresh(self, _now) -> None:
+        """Refresh state at midnight and reschedule."""
+        self.async_schedule_update_ha_state()
+        self._schedule_next_midnight_refresh()
 
 
 async def async_setup_entry(
@@ -31,14 +96,14 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BinTrackerStatusSensor(SensorEntity):
+class BinTrackerStatusSensor(BinDayTrackerBaseEntity):
     """Status sensor showing bin tracker info."""
 
     _attr_has_entity_name = False
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        self.entry = entry
+        super().__init__(entry)
         self._attr_unique_id = f"{entry.entry_id}_status"
         self._attr_name = "Bin Day Tracker Status"
 
@@ -72,7 +137,7 @@ class BinTrackerStatusSensor(SensorEntity):
         }
 
 
-class BinCountdownSensor(SensorEntity):
+class BinCountdownSensor(BinDayTrackerBaseEntity):
     """Countdown sensor for an individual bin."""
 
     _attr_has_entity_name = False
@@ -80,11 +145,10 @@ class BinCountdownSensor(SensorEntity):
 
     def __init__(self, entry: ConfigEntry, bin_item: dict) -> None:
         """Initialize the bin sensor."""
-        self.entry = entry
+        super().__init__(entry)
         self.bin_item = bin_item
-
         self._attr_unique_id = f"{entry.entry_id}_{bin_item['id']}"
-        self._attr_name = f"{bin_item['name']} Bin"
+        self._attr_name = f"Bin {bin_item['name']}"
 
     @property
     def native_value(self):
@@ -125,7 +189,7 @@ class BinCountdownSensor(SensorEntity):
         }
 
 
-class BinNextCollectionSensor(SensorEntity):
+class BinNextCollectionSensor(BinDayTrackerBaseEntity):
     """Aggregate sensor for the next collection."""
 
     _attr_has_entity_name = False
@@ -133,60 +197,16 @@ class BinNextCollectionSensor(SensorEntity):
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the aggregate sensor."""
-        self.entry = entry
+        super().__init__(entry)
         self._attr_unique_id = f"{entry.entry_id}_next_collection"
         self._attr_name = "Bin Day Tracker Next Collection"
-
-    def _get_enabled_bins_with_calculations(self) -> list[dict]:
-        """Return enabled bins with calculated countdown data."""
-        bins = self.entry.options.get("bins", [])
-        calculated_bins: list[dict] = []
-
-        for bin_item in bins:
-            if not bin_item.get("enabled", True):
-                continue
-
-            calculation = calculate_next_collection(
-                start_date_str=bin_item["start_date"],
-                repeat_days=bin_item["repeat_days"],
-            )
-
-            combined = dict(bin_item)
-            combined.update(calculation)
-            calculated_bins.append(combined)
-
-        return calculated_bins
-
-    def _get_selected_bin(self) -> tuple[dict | None, list[dict]]:
-        """Return the selected display bin and all bins due that day."""
-        calculated_bins = self._get_enabled_bins_with_calculations()
-
-        if not calculated_bins:
-            return None, []
-
-        earliest_days_until = min(bin_item["days_until"] for bin_item in calculated_bins)
-
-        due_bins = [
-            bin_item
-            for bin_item in calculated_bins
-            if bin_item["days_until"] == earliest_days_until
-        ]
-
-        due_bins.sort(key=lambda item: item.get("display_order", 9999))
-
-        primary_bins = [bin_item for bin_item in due_bins if bin_item.get("primary", False)]
-
-        if primary_bins:
-            selected_bin = primary_bins[0]
-        else:
-            selected_bin = due_bins[0]
-
-        return selected_bin, due_bins
 
     @property
     def native_value(self):
         """Return the selected bin label."""
-        selected_bin, _due_bins = self._get_selected_bin()
+        selected_bin, _due_bins = select_next_display_bin(
+            self.entry.options.get("bins", [])
+        )
 
         if selected_bin is None:
             return "No bins configured"
@@ -196,7 +216,9 @@ class BinNextCollectionSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return aggregate sensor attributes."""
-        selected_bin, due_bins = self._get_selected_bin()
+        selected_bin, due_bins = select_next_display_bin(
+            self.entry.options.get("bins", [])
+        )
 
         if selected_bin is None:
             return {
@@ -221,9 +243,7 @@ class BinNextCollectionSensor(SensorEntity):
             if bin_item["id"] != selected_bin["id"]
         ]
 
-        selected_entity_id = (
-            f"sensor.{selected_bin['name'].lower().replace(' ', '_')}_bin"
-        )
+        selected_entity_id = f"sensor.bin_{selected_bin['name'].lower().replace(' ', '_')}"
 
         return {
             "days_until": selected_bin["days_until"],

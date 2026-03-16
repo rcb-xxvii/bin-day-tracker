@@ -24,14 +24,7 @@ def calculate_next_collection(
     repeat_days: int,
     today: date | None = None,
 ) -> dict:
-    """Calculate the next collection date and countdown details.
-
-    Future collections are based on:
-    start_date + (N * repeat_days)
-
-    Where N is the smallest non-negative integer such that the result
-    is on or after today.
-    """
+    """Calculate the next collection date and countdown details."""
     if today is None:
         today = date.today()
 
@@ -57,3 +50,50 @@ def calculate_next_collection(
         "days_until": days_until,
         "display_text": format_countdown(days_until),
     }
+
+
+def get_enabled_bins_with_calculations(bins: list[dict]) -> list[dict]:
+    """Return enabled bins with calculated countdown data."""
+    calculated_bins: list[dict] = []
+
+    for bin_item in bins:
+        if not bin_item.get("enabled", True):
+            continue
+
+        calculation = calculate_next_collection(
+            start_date_str=bin_item["start_date"],
+            repeat_days=bin_item["repeat_days"],
+        )
+
+        combined = dict(bin_item)
+        combined.update(calculation)
+        calculated_bins.append(combined)
+
+    return calculated_bins
+
+
+def select_next_display_bin(bins: list[dict]) -> tuple[dict | None, list[dict]]:
+    """Return the selected display bin and all bins due on the earliest day."""
+    calculated_bins = get_enabled_bins_with_calculations(bins)
+
+    if not calculated_bins:
+        return None, []
+
+    earliest_days_until = min(bin_item["days_until"] for bin_item in calculated_bins)
+
+    due_bins = [
+        bin_item
+        for bin_item in calculated_bins
+        if bin_item["days_until"] == earliest_days_until
+    ]
+
+    due_bins.sort(key=lambda item: item.get("display_order", 9999))
+
+    primary_bins = [bin_item for bin_item in due_bins if bin_item.get("primary", False)]
+
+    if primary_bins:
+        selected_bin = primary_bins[0]
+    else:
+        selected_bin = due_bins[0]
+
+    return selected_bin, due_bins
