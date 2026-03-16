@@ -12,11 +12,16 @@
     }
   },
   "options": {
+    "abort": {
+      "no_bins_configured": "There are no bins to manage.",
+      "bin_not_found": "The selected bin could not be found."
+    },
     "step": {
       "init": {
         "title": "Bin Day Tracker",
         "menu_options": {
-          "add_bin": "Add bin"
+          "add_bin": "Add bin",
+          "manage_bins": "Manage bins"
         }
       },
       "add_bin": {
@@ -30,6 +35,34 @@
           "primary": "Primary bin",
           "start_date": "Start date (YYYY-MM-DD)",
           "repeat_days": "Repeat interval in days"
+        }
+      },
+      "manage_bins": {
+        "title": "Manage bins",
+        "description": "Choose a bin to edit.",
+        "data": {
+          "selected_bin": "Bin"
+        }
+      },
+      "edit_selected_bin": {
+        "title": "Edit bin",
+        "description": "Update settings for {bin_name}.",
+        "data": {
+          "name": "Bin name",
+          "material": "Material label",
+          "colour": "Display colour",
+          "enabled": "Enabled",
+          "primary": "Primary bin",
+          "start_date": "Start date (YYYY-MM-DD)",
+          "repeat_days": "Repeat interval in days",
+          "action": "Action"
+        }
+      },
+      "delete_selected_bin": {
+        "title": "Delete bin",
+        "description": "Are you sure you want to delete {bin_name}?",
+        "data": {
+          "confirm": "Yes, delete this bin"
         }
       }
     },
