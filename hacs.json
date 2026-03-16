@@ -1,5 +1,5 @@
 {
-  "name": "Simple Bin Day Tracker",
+  "name": "Offline Bin Day Tracker",
   "content_in_root": false,
   "domains": ["bin_day_tracker"],
   "homeassistant": "2024.1.0"
