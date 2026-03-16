@@ -30,10 +30,7 @@ Designed to work cleanly with dashboard cards (e.g. Mushroom) without complex te
 2. Go to **Integrations**
 3. Click the **⋮ menu (top right)**
 4. Choose **Custom repositories**
-5. Add:
-
-
-https://github.com/rcb-xxvii/bin-day-tracker
+5. Add: https://github.com/rcb-xxvii/bin-day-tracker
 
 
 Category: **Integration**
@@ -169,14 +166,3 @@ primary: "{{ state_attr(entity,'selected_bin_label') }}"
 secondary: "{{ state_attr(entity,'display_text') }}"
 icon: mdi:trash-can-outline
 icon_color: "{{ state_attr(entity,'selected_bin_colour') }}"
-Roadmap
-
-Possible future enhancements:
-
-calendar entity
-
-notification helpers
-
-council schedule import
-
-multi-household support
