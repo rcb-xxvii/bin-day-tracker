@@ -1,0 +1,1 @@
+"""Sensor platform for Bin Day Tracker."""

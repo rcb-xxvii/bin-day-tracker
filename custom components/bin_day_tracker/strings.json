@@ -1,0 +1,14 @@
+{
+  "title": "Bin Day Tracker",
+  "config": {
+    "abort": {
+      "single_instance_allowed": "Only one Bin Day Tracker instance is allowed."
+    },
+    "step": {
+      "user": {
+        "title": "Set up Bin Day Tracker",
+        "description": "Create the Bin Day Tracker integration."
+      }
+    }
+  }
+}

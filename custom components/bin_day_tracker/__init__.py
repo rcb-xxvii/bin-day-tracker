@@ -1,0 +1,1 @@
+"""The Bin Day Tracker integration."""
