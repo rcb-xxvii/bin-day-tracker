@@ -1,13 +1,13 @@
 {
   "domain": "bin_day_tracker",
   "name": "Bin Day Tracker",
-  "version": "1.0.0",
-  "documentation": "https://github.com/rcb-xxvii/bin-day-tracker",
-  "issue_tracker": "https://github.com/rcb-xxvii/bin-day-tracker/issues",
+  "codeowners": ["@rcb-xxvii"],
   "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/rcb-xxvii/bin-day-tracker",
   "integration_type": "helper",
   "iot_class": "calculated",
-  "codeowners": ["@rcb-xxvii"],
-  "dependencies": [],
-  "requirements": []
+  "issue_tracker": "https://github.com/rcb-xxvii/bin-day-tracker/issues",
+  "requirements": [],
+  "version": "1.0.0"
 }
