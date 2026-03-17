@@ -97,3 +97,78 @@ def select_next_display_bin(bins: list[dict]) -> tuple[dict | None, list[dict]]:
         selected_bin = due_bins[0]
 
     return selected_bin, due_bins
+
+    def get_next_collection_date(
+    start_date_str: str,
+    repeat_days: int,
+    today: date | None = None,
+) -> date:
+    """Return the next collection date as a date object."""
+    if today is None:
+        today = date.today()
+
+    start_date = parse_bin_date(start_date_str)
+
+    if repeat_days <= 0:
+        raise ValueError("repeat_days must be greater than 0")
+
+    if start_date >= today:
+        return start_date
+
+    days_since_start = (today - start_date).days
+    intervals_passed = days_since_start // repeat_days
+    next_collection = start_date + timedelta(days=intervals_passed * repeat_days)
+
+    if next_collection < today:
+        next_collection += timedelta(days=repeat_days)
+
+    return next_collection
+
+
+def expand_bin_events_in_range(
+    bins: list[dict],
+    start_day: date,
+    end_day: date,
+) -> list[dict]:
+    """Expand enabled recurring bin events in a date range.
+
+    Returned events are dicts with:
+    - name
+    - material
+    - colour
+    - primary
+    - start
+    - end
+
+    The end date is exclusive for all-day calendar events.
+    """
+    events: list[dict] = []
+
+    for bin_item in bins:
+        if not bin_item.get("enabled", True):
+            continue
+
+        repeat_days = bin_item["repeat_days"]
+        event_day = get_next_collection_date(
+            start_date_str=bin_item["start_date"],
+            repeat_days=repeat_days,
+            today=start_day,
+        )
+
+        while event_day < end_day:
+            if event_day >= start_day:
+                events.append(
+                    {
+                        "name": bin_item["name"],
+                        "material": bin_item["material"],
+                        "colour": bin_item["colour"],
+                        "primary": bin_item["primary"],
+                        "start": event_day,
+                        "end": event_day + timedelta(days=1),
+                    }
+                )
+
+            event_day += timedelta(days=repeat_days)
+
+    events.sort(key=lambda item: (item["start"], item["name"].lower()))
+    return events
